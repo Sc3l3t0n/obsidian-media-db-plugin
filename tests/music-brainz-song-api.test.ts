@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { Release } from 'packages/obsidian/src/api/apis/MusicBrainzSongAPI';
-import { selectSongAlbums } from 'packages/obsidian/src/api/apis/MusicBrainzSongAPI';
+import { releaseGroupCoverUrl } from 'packages/obsidian/src/api/apis/MusicBrainzAPI';
+import { findSongCover, selectSongAlbums, songCoverCandidates } from 'packages/obsidian/src/api/apis/MusicBrainzSongAPI';
 
 function release(title: string, groupTitle: string, primaryType: string, opts: { date?: string; status?: string; secondaryTypes?: string[] } = {}): Release {
 	return {
@@ -51,4 +52,33 @@ test('mainAlbum returns nothing when no release qualifies', () => {
 
 test('allReleases keeps every distinct release title', () => {
 	expect(selectSongAlbums([...releases, releases[0]], 'allReleases')).toEqual(releases.map(r => r.title));
+});
+
+test('earliestAlbum cover candidates start with the oldest album, undated last', () => {
+	expect(songCoverCandidates(releases, 'earliestAlbum')).toEqual(['Album', 'Second Album', 'Undated Album']);
+});
+
+test('latestAlbum cover candidates start with the newest dated album, undated last', () => {
+	expect(songCoverCandidates(releases, 'latestAlbum')).toEqual(['Second Album', 'Album', 'Undated Album']);
+});
+
+test('cover candidates fall back to singles and EPs and are empty when no release qualifies', () => {
+	const noAlbum = releases.filter(r => r['release-group']?.['primary-type'] !== 'Album' || (r['release-group']['secondary-types']?.length ?? 0) > 0);
+	expect(songCoverCandidates(noAlbum, 'latestAlbum')).toEqual(['Song']);
+	expect(songCoverCandidates([releases[1], releases[2], releases[3]], 'earliestAlbum')).toEqual([]);
+	expect(songCoverCandidates(undefined, 'earliestAlbum')).toEqual([]);
+});
+
+test('findSongCover skips albums without a cover and stops at the first one with a cover', async () => {
+	const checked: string[] = [];
+	const coverExists = async (url: string): Promise<boolean> => {
+		checked.push(url);
+		return !url.includes('/Second Album/');
+	};
+	expect(await findSongCover(releases, 'latestAlbum', coverExists)).toBe(releaseGroupCoverUrl('Album'));
+	expect(checked).toEqual([releaseGroupCoverUrl('Second Album'), releaseGroupCoverUrl('Album')]);
+});
+
+test('findSongCover returns an empty string when no album has a cover', async () => {
+	expect(await findSongCover(releases, 'earliestAlbum', async () => false)).toBe('');
 });

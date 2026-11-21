@@ -57,6 +57,14 @@ function createPropertyMappingsDescription(): DocumentFragment {
  */
 export type SongAlbumSelection = 'allAlbums' | 'mainAlbum' | 'allReleases';
 
+/**
+ * Which album the MusicBrainz song API takes a song's cover from.
+ * Candidates are the same albums as `allAlbums` in {@link SongAlbumSelection}, ordered by release date.
+ * - `earliestAlbum`: the oldest album, usually the one the song first came out on.
+ * - `latestAlbum`: the newest album.
+ */
+export type SongCoverSelection = 'earliestAlbum' | 'latestAlbum';
+
 export interface MediaDbPluginSettings {
 	OMDbKeyId: string;
 	TMDBKeyId: string;
@@ -130,6 +138,7 @@ export interface MediaDbPluginSettings {
 	songFolder: string;
 
 	songAlbumSelection: SongAlbumSelection;
+	songCoverSelection: SongCoverSelection;
 
 	propertyMappingModels: PropertyMappingModelData[];
 
@@ -410,6 +419,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	songFolder: 'Media DB/songs',
 
 	songAlbumSelection: 'allAlbums',
+	songCoverSelection: 'earliestAlbum',
 
 	propertyMappingModels: [],
 
@@ -860,6 +870,23 @@ export class MediaDbSettingTab extends PluginSettingTab {
 									.setValue(this.plugin.settings.songAlbumSelection)
 									.onChange(data => {
 										this.plugin.settings.songAlbumSelection = data as SongAlbumSelection;
+										void this.plugin.saveSettings();
+									});
+							}),
+				);
+				mediaTypeGroup.addSetting(
+					setting =>
+						void setting
+							.setName('Cover album')
+							.setDesc(
+								'Which album the song cover comes from. Only official studio albums are considered (falls back to singles and EPs). Earliest album: the oldest one, usually the album the song first came out on. Latest album: the newest one. Albums without a cover in the Cover Art Archive are skipped.',
+							)
+							.addDropdown(cb => {
+								cb.addOption('earliestAlbum', 'Earliest album')
+									.addOption('latestAlbum', 'Latest album')
+									.setValue(this.plugin.settings.songCoverSelection)
+									.onChange(data => {
+										this.plugin.settings.songCoverSelection = data as SongCoverSelection;
 										void this.plugin.saveSettings();
 									});
 							}),

@@ -3,6 +3,7 @@
 # Unreleased
 
 - Added an album selection setting for songs. By default, songs now list only the official studio albums they appear on, using release group titles so links match album notes. Singles and EPs are used when a song is on no album [#2](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/2)
+- Added a cover image to songs, taken from the earliest or latest official studio album the song is on (or its single or EP). A new cover album setting picks earliest (default) or latest. Albums without a cover in the Cover Art Archive are skipped [#3](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/3)
 - Fixed songs listing every release a recording appears on, including singles, compilations, live albums and regional editions. The old behaviour is available as the `All releases` option [#2](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/2)
 
 # 0.10.0

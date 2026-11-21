@@ -10,6 +10,7 @@ export class SongModel extends MediaTypeModel {
 	albums: string[];
 	duration: string;
 	genres: string[];
+	image: string;
 
 	userData: {
 		personalRating: number;
@@ -22,6 +23,7 @@ export class SongModel extends MediaTypeModel {
 		this.albums = [];
 		this.duration = '';
 		this.genres = [];
+		this.image = '';
 
 		this.userData = {
 			personalRating: 0,

@@ -1,15 +1,16 @@
 import { APIModel } from 'packages/obsidian/src/api/APIModel';
-import { millisecondsToMinutes, requestMusicBrainz } from 'packages/obsidian/src/api/apis/MusicBrainzAPI';
+import { millisecondsToMinutes, releaseGroupCoverUrl, requestMusicBrainz } from 'packages/obsidian/src/api/apis/MusicBrainzAPI';
 import type MediaDbPlugin from 'packages/obsidian/src/main';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
 import { SongModel } from 'packages/obsidian/src/models/SongModel';
-import type { SongAlbumSelection } from 'packages/obsidian/src/settings/Settings';
+import type { SongAlbumSelection, SongCoverSelection } from 'packages/obsidian/src/settings/Settings';
 import { Logger } from 'packages/obsidian/src/utils/Logger';
 import type { MDBError } from 'packages/obsidian/src/utils/MDBError';
 import { MDBErrorKind, toMdbError } from 'packages/obsidian/src/utils/MDBError';
 import { MediaType } from 'packages/obsidian/src/utils/MediaType';
 import type { Result } from 'packages/obsidian/src/utils/result';
 import { err, fromPromise, ok } from 'packages/obsidian/src/utils/result';
+import { imageUrlExists } from 'packages/obsidian/src/utils/Utils';
 
 // sadly no open api schema available
 
@@ -44,23 +45,22 @@ export interface Release {
 	};
 }
 
+interface ReleaseGroupRef {
+	id: string;
+	title: string;
+	/** Date of the group's earliest release, or an empty string if no release has a date. */
+	date: string;
+}
+
 /**
- * Picks the album titles for a song from the releases its recording appears on.
+ * Returns the release groups a song is canonically on, ordered by their earliest release date.
  *
- * `allAlbums` and `mainAlbum` only consider official releases whose release group has no secondary types (no compilation, live, ...).
+ * Only official releases whose release group has no secondary types (no compilation, live, ...) are considered.
  * Release groups with primary type Album are used; if there are none, Singles and EPs are used instead.
- * Release-group titles are returned, so they match album notes created from release groups.
- * - `allAlbums`: every matching release group, ordered by its earliest release date.
- * - `mainAlbum`: only the earliest matching release group.
- * - `allReleases`: the deduplicated title of every release.
  */
-export function selectSongAlbums(releases: Release[] | undefined, selection: SongAlbumSelection): string[] {
+function selectAlbumGroups(releases: Release[] | undefined): ReleaseGroupRef[] {
 	if (!releases) {
 		return [];
-	}
-
-	if (selection === 'allReleases') {
-		return [...new Set(releases.map(r => r.title))];
 	}
 
 	const candidates = releases
@@ -68,22 +68,70 @@ export function selectSongAlbums(releases: Release[] | undefined, selection: Son
 		.sort((a, b) => compareDates(releaseDate(a), releaseDate(b)));
 
 	// Releases are sorted by date, so each release group keeps the position of its earliest release.
-	const groupTitles = (primaryTypes: string[]): string[] => {
-		const titles = new Map<string, string>();
+	const groupsWithPrimaryType = (primaryTypes: string[]): ReleaseGroupRef[] => {
+		const byId = new Map<string, ReleaseGroupRef>();
 		for (const release of candidates) {
 			const group = release['release-group'];
-			if (group && primaryTypes.includes(group['primary-type'] ?? '') && !titles.has(group.id)) {
-				titles.set(group.id, group.title);
+			if (group && primaryTypes.includes(group['primary-type'] ?? '') && !byId.has(group.id)) {
+				byId.set(group.id, { id: group.id, title: group.title, date: releaseDate(release) });
 			}
 		}
-		return [...new Set(titles.values())];
+		return [...byId.values()];
 	};
 
-	let titles = groupTitles(['Album']);
-	if (titles.length === 0) {
-		titles = groupTitles(['Single', 'EP']);
+	const albums = groupsWithPrimaryType(['Album']);
+	return albums.length > 0 ? albums : groupsWithPrimaryType(['Single', 'EP']);
+}
+
+/**
+ * Picks the album titles for a song from the releases its recording appears on.
+ *
+ * Release-group titles are returned, so they match album notes created from release groups.
+ * - `allAlbums`: every release group from {@link selectAlbumGroups}, earliest first.
+ * - `mainAlbum`: only the earliest of those release groups.
+ * - `allReleases`: the deduplicated title of every release.
+ */
+export function selectSongAlbums(releases: Release[] | undefined, selection: SongAlbumSelection): string[] {
+	if (selection === 'allReleases') {
+		return [...new Set((releases ?? []).map(r => r.title))];
 	}
+
+	const titles = [...new Set(selectAlbumGroups(releases).map(g => g.title))];
 	return selection === 'mainAlbum' ? titles.slice(0, 1) : titles;
+}
+
+/**
+ * Returns the release-group IDs a song's cover can come from, most preferred first.
+ * Candidates are the albums from {@link selectAlbumGroups}; the album selection setting does not apply.
+ * - `earliestAlbum`: oldest album first.
+ * - `latestAlbum`: newest dated album first. Undated albums come after every dated one.
+ */
+export function songCoverCandidates(releases: Release[] | undefined, selection: SongCoverSelection): string[] {
+	const groups = selectAlbumGroups(releases);
+	if (selection === 'earliestAlbum') {
+		return groups.map(g => g.id);
+	}
+	const dated = groups.filter(g => g.date).reverse();
+	const undated = groups.filter(g => !g.date).reverse();
+	return [...dated, ...undated].map(g => g.id);
+}
+
+/**
+ * Returns the cover URL of the first candidate album that has a front cover in the Cover Art Archive, or an empty string if none has one.
+ * Sends one HEAD request per candidate until a cover is found. The Cover Art Archive is not rate limited like MusicBrainz.
+ */
+export async function findSongCover(
+	releases: Release[] | undefined,
+	selection: SongCoverSelection,
+	coverExists: (url: string) => Promise<boolean> = imageUrlExists,
+): Promise<string> {
+	for (const releaseGroupId of songCoverCandidates(releases, selection)) {
+		const url = releaseGroupCoverUrl(releaseGroupId);
+		if (await coverExists(url)) {
+			return url;
+		}
+	}
+	return '';
 }
 
 function releaseDate(release: Release): string {
@@ -175,14 +223,18 @@ export class MusicBrainzSongAPI extends APIModel {
 		const result = (await fetchData.json) as Recording;
 		Logger.debug(result);
 
-		return ok(this.createSongModel(result));
+		const image = await findSongCover(result.releases, this.plugin.settings.songCoverSelection);
+		return ok(this.createSongModel(result, image));
 	}
 
 	getDisabledMediaTypes(): MediaType[] {
 		return this.plugin.settings.MusicBrainzSongAPI_disabledMediaTypes;
 	}
 
-	private createSongModel(result: Recording): SongModel {
+	/**
+	 * @param image cover URL. Search results leave it empty, because checking covers for every result would need a request each.
+	 */
+	private createSongModel(result: Recording, image: string = ''): SongModel {
 		const firstReleaseDate = result['first-release-date'];
 
 		return new SongModel({
@@ -193,6 +245,7 @@ export class MusicBrainzSongAPI extends APIModel {
 			dataSource: this.apiName,
 			url: 'https://musicbrainz.org/recording/' + result.id,
 			id: result.id,
+			image,
 
 			artists: result['artist-credit']?.map(a => a.name) ?? [],
 			albums: selectSongAlbums(result.releases, this.plugin.settings.songAlbumSelection),

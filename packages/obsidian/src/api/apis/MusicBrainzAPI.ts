@@ -119,6 +119,14 @@ export function requestMusicBrainz(url: string): Promise<RequestUrlResponse> {
 	return request;
 }
 
+/**
+ * Returns the Cover Art Archive URL of a release group's front cover, limited to 500px.
+ * The URL is built without a request, so it may point to a cover that does not exist.
+ */
+export function releaseGroupCoverUrl(releaseGroupId: string): string {
+	return `https://coverartarchive.org/release-group/${releaseGroupId}/front-500.jpg`;
+}
+
 export class MusicBrainzAPI extends APIModel {
 	plugin: MediaDbPlugin;
 	apiDateFormat: string = 'YYYY-MM-DD';
@@ -179,7 +187,7 @@ export class MusicBrainzAPI extends APIModel {
 					dataSource: this.apiName,
 					url: 'https://musicbrainz.org/release-group/' + result.id,
 					id: result.id,
-					image: 'https://coverartarchive.org/release-group/' + result.id + '/front-500.jpg',
+					image: releaseGroupCoverUrl(result.id),
 
 					artists: result['artist-credit'].map(a => a.name),
 					subType: result['primary-type'],
@@ -279,7 +287,7 @@ export class MusicBrainzAPI extends APIModel {
 				dataSource: this.apiName,
 				url: 'https://musicbrainz.org/release-group/' + result.id,
 				id: result.id,
-				image: 'https://coverartarchive.org/release-group/' + result.id + '/front-500.jpg',
+				image: releaseGroupCoverUrl(result.id),
 
 				artists: result['artist-credit'].map(a => a.name),
 				language: releaseData['text-representation'].language ? getLanguageName(releaseData['text-representation'].language) : 'Unknown',

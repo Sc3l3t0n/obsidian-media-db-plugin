@@ -4,6 +4,7 @@ import { Notice, normalizePath, parseYaml, requestUrl, stringifyYaml } from 'obs
 import type MediaDbPlugin from 'packages/obsidian/src/main';
 import { ConfirmOverwriteModal } from 'packages/obsidian/src/modals/ConfirmOverwriteModal';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
+import { createDateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTemplates';
 import { Logger } from 'packages/obsidian/src/utils/Logger';
 import type { MDBError } from 'packages/obsidian/src/utils/MDBError';
 import { MDBErrorKind, toMdbError } from 'packages/obsidian/src/utils/MDBError';
@@ -150,7 +151,8 @@ export class MediaDbFileHelper {
 	}
 
 	async generateMediaDbNoteContents(mediaTypeModel: MediaTypeModel, options: CreateNoteOptions): Promise<string> {
-		let template = await this.plugin.mediaTypeManager.getTemplate(mediaTypeModel, this.plugin.app);
+		const dateTimeResolver = this.plugin.settings.enableCoreTemplatesIntegration ? createDateTimeTagResolver(this.plugin.app, this.plugin.dateFormatter) : undefined;
+		let template = await this.plugin.mediaTypeManager.getTemplate(mediaTypeModel, this.plugin.app, dateTimeResolver);
 		let fileMetadata: Record<string, unknown>;
 
 		if (this.plugin.settings.useDefaultFrontMatter) {

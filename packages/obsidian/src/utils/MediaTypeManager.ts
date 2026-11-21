@@ -13,6 +13,7 @@ import { SeriesModel } from 'packages/obsidian/src/models/SeriesModel';
 import { SongModel } from 'packages/obsidian/src/models/SongModel';
 import { WikiModel } from 'packages/obsidian/src/models/WikiModel';
 import type { MediaDbPluginSettings } from 'packages/obsidian/src/settings/Settings';
+import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTemplates';
 import { ILLEGAL_FILENAME_CHARACTERS } from 'packages/obsidian/src/utils/IllegalFilenameCharactersList';
 import { MediaType } from 'packages/obsidian/src/utils/MediaType';
 import { replaceTags } from 'packages/obsidian/src/utils/Utils';
@@ -85,7 +86,7 @@ export class MediaTypeManager {
 	getFileName(mediaTypeModel: MediaTypeModel): string {
 		// Ignore undefined tags since some search APIs do not return all properties in the model and produce clean file names even if errors occur
 		const template = this.mediaFileNameTemplateMap.get(mediaTypeModel.getMediaType()) ?? '{{ title }}';
-		const fileName = replaceTags(template, mediaTypeModel, true);
+		const fileName = replaceTags(template, mediaTypeModel, { ignoreUndefined: true });
 		return this.cleanFileName(fileName);
 	}
 
@@ -95,7 +96,7 @@ export class MediaTypeManager {
 		return cleanedFileName.replaceAll(/ +/g, ' ');
 	}
 
-	async getTemplate(mediaTypeModel: MediaTypeModel, app: App): Promise<string> {
+	async getTemplate(mediaTypeModel: MediaTypeModel, app: App, dateTimeResolver?: DateTimeTagResolver): Promise<string> {
 		const templateFilePath = this.mediaTemplateMap.get(mediaTypeModel.getMediaType());
 
 		if (!templateFilePath) {
@@ -122,7 +123,7 @@ export class MediaTypeManager {
 		}
 
 		const template = await app.vault.cachedRead(templateFile);
-		return replaceTags(template, mediaTypeModel);
+		return replaceTags(template, mediaTypeModel, { dateTimeResolver });
 	}
 
 	async getFolder(mediaTypeModel: MediaTypeModel, app: App): Promise<TFolder> {

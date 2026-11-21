@@ -1,5 +1,12 @@
 # Changelog
 
+# 0.10.0
+
+- Added a song media type, with its own template, folder, file name template and property mappings [#1](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/1)
+- Added song search and lookup by MBID through the `MusicBrainz` API [#1](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/1)
+- Rate limited all `MusicBrainz` requests to one per second, as required by the MusicBrainz API [#1](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/1)
+- Fixed the version sent in the `MusicBrainz` User-Agent header
+
 # 0.9.1
 
 - Fixed plugin failing to load when no `data.json` was present [#285](https://github.com/mProjectsCode/obsidian-media-db-plugin/pull/285) (thanks ltctceplrm)

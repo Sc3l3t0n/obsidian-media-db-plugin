@@ -6,7 +6,7 @@ import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel
 export const pluginName: string = 'obsidian-media-db-plugin';
 export const contactEmail: string = 'm.projects.code@gmail.com';
 export const mediaDbTag: string = 'mediaDB';
-export const mediaDbVersion: string = '0.9.1';
+export const mediaDbVersion: string = '0.10.0';
 
 export function wrapAround(value: number, size: number): number {
 	if (size <= 0) {

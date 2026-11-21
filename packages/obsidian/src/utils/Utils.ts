@@ -7,7 +7,7 @@ import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTempla
 export const pluginName: string = 'obsidian-media-db-plugin';
 export const contactEmail: string = 'm.projects.code@gmail.com';
 export const mediaDbTag: string = 'mediaDB';
-export const mediaDbVersion: string = '0.10.0';
+export const mediaDbVersion: string = '0.11.0';
 
 export function wrapAround(value: number, size: number): number {
 	if (size <= 0) {
@@ -246,7 +246,7 @@ export function unCamelCase(str: string): string {
 			// space before last upper in a sequence followed by lower
 			.replace(/\b([A-Z]+)([A-Z])([a-z])/, '$1 $2$3')
 			// uppercase the first character
-			.replace(/^./, function (str) {
+			.replace(/^./, function(str) {
 				return str.toUpperCase();
 			})
 	);

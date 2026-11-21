@@ -8,6 +8,7 @@ import { MusicReleaseModel } from 'packages/obsidian/src/models/MusicReleaseMode
 import { SeasonModel } from 'packages/obsidian/src/models/SeasonModel';
 import { SeasonSearchResultModel } from 'packages/obsidian/src/models/SeasonSearchResultModel';
 import { SeriesModel } from 'packages/obsidian/src/models/SeriesModel';
+import { SongModel } from 'packages/obsidian/src/models/SongModel';
 import { WikiModel } from 'packages/obsidian/src/models/WikiModel';
 import { MediaType } from 'packages/obsidian/src/utils/MediaType';
 import { MediaTypeManager } from 'packages/obsidian/src/utils/MediaTypeManager';
@@ -24,6 +25,7 @@ test('MediaTypeManager creates the expected model for every supported media type
 		[MediaType.MusicRelease, MusicReleaseModel],
 		[MediaType.Season, SeasonModel],
 		[MediaType.Series, SeriesModel],
+		[MediaType.Song, SongModel],
 		[MediaType.Wiki, WikiModel],
 	] as const;
 

@@ -78,6 +78,7 @@ export interface MediaDbPluginSettings {
 	MALAPIManga_disabledMediaTypes: MediaType[];
 	//MobyGamesAPI_disabledMediaTypes: MediaType[];
 	MusicBrainzAPI_disabledMediaTypes: MediaType[];
+	MusicBrainzSongAPI_disabledMediaTypes: MediaType[];
 	OMDbAPI_disabledMediaTypes: MediaType[];
 	OpenLibraryAPI_disabledMediaTypes: MediaType[];
 	SteamAPI_disabledMediaTypes: MediaType[];
@@ -96,6 +97,7 @@ export interface MediaDbPluginSettings {
 	musicReleaseTemplate: string;
 	boardgameTemplate: string;
 	bookTemplate: string;
+	songTemplate: string;
 
 	movieFileNameTemplate: string;
 	seriesFileNameTemplate: string;
@@ -106,6 +108,7 @@ export interface MediaDbPluginSettings {
 	musicReleaseFileNameTemplate: string;
 	boardgameFileNameTemplate: string;
 	bookFileNameTemplate: string;
+	songFileNameTemplate: string;
 
 	movieFolder: string;
 	seriesFolder: string;
@@ -116,6 +119,7 @@ export interface MediaDbPluginSettings {
 	musicReleaseFolder: string;
 	boardgameFolder: string;
 	bookFolder: string;
+	songFolder: string;
 
 	propertyMappingModels: PropertyMappingModelData[];
 
@@ -161,6 +165,8 @@ class MediaTypeMappedSettings {
 				return settings.boardgameTemplate;
 			case MediaType.Book:
 				return settings.bookTemplate;
+			case MediaType.Song:
+				return settings.songTemplate;
 		}
 	}
 
@@ -193,6 +199,9 @@ class MediaTypeMappedSettings {
 			case MediaType.Book:
 				settings.bookTemplate = template;
 				break;
+			case MediaType.Song:
+				settings.songTemplate = template;
+				break;
 		}
 	}
 
@@ -216,6 +225,8 @@ class MediaTypeMappedSettings {
 				return settings.boardgameFileNameTemplate;
 			case MediaType.Book:
 				return settings.bookFileNameTemplate;
+			case MediaType.Song:
+				return settings.songFileNameTemplate;
 		}
 	}
 
@@ -248,6 +259,9 @@ class MediaTypeMappedSettings {
 			case MediaType.Book:
 				settings.bookFileNameTemplate = template;
 				break;
+			case MediaType.Song:
+				settings.songFileNameTemplate = template;
+				break;
 		}
 	}
 
@@ -271,6 +285,8 @@ class MediaTypeMappedSettings {
 				return settings.boardgameFolder;
 			case MediaType.Book:
 				return settings.bookFolder;
+			case MediaType.Song:
+				return settings.songFolder;
 		}
 	}
 
@@ -302,6 +318,9 @@ class MediaTypeMappedSettings {
 				break;
 			case MediaType.Book:
 				settings.bookFolder = folder;
+				break;
+			case MediaType.Song:
+				settings.songFolder = folder;
 				break;
 		}
 	}
@@ -337,6 +356,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	MALAPIManga_disabledMediaTypes: [],
 	//MobyGamesAPI_disabledMediaTypes: [],
 	MusicBrainzAPI_disabledMediaTypes: [],
+	MusicBrainzSongAPI_disabledMediaTypes: [],
 	OMDbAPI_disabledMediaTypes: [],
 	OpenLibraryAPI_disabledMediaTypes: [],
 	SteamAPI_disabledMediaTypes: [],
@@ -355,6 +375,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	musicReleaseTemplate: '',
 	boardgameTemplate: '',
 	bookTemplate: '',
+	songTemplate: '',
 
 	movieFileNameTemplate: '{{ title }} ({{ year }})',
 	seriesFileNameTemplate: '{{ title }} ({{ year }})',
@@ -365,6 +386,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	musicReleaseFileNameTemplate: '{{ title }} (by {{ ENUM:artists }} - {{ year }})',
 	boardgameFileNameTemplate: '{{ title }} ({{ year }})',
 	bookFileNameTemplate: '{{ title }} ({{ year }})',
+	songFileNameTemplate: '{{ title }} (by {{ ENUM:artists }} - {{ year }})',
 
 	movieFolder: 'Media DB/movies',
 	seriesFolder: 'Media DB/series',
@@ -375,6 +397,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	musicReleaseFolder: 'Media DB/music',
 	boardgameFolder: 'Media DB/boardgames',
 	bookFolder: 'Media DB/books',
+	songFolder: 'Media DB/songs',
 
 	propertyMappingModels: [],
 

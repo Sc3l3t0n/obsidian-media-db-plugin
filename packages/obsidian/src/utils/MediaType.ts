@@ -8,4 +8,5 @@ export enum MediaType {
 	Wiki = 'wiki',
 	BoardGame = 'boardgame',
 	Book = 'book',
+	Song = 'song',
 }

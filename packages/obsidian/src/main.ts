@@ -7,6 +7,7 @@ import { IGDBAPI } from 'packages/obsidian/src/api/apis/IGDBAPI';
 import { MALAPI } from 'packages/obsidian/src/api/apis/MALAPI';
 import { MALAPIManga } from 'packages/obsidian/src/api/apis/MALAPIManga';
 import { MusicBrainzAPI } from 'packages/obsidian/src/api/apis/MusicBrainzAPI';
+import { MusicBrainzSongAPI } from 'packages/obsidian/src/api/apis/MusicBrainzSongAPI';
 import { OMDbAPI } from 'packages/obsidian/src/api/apis/OMDbAPI';
 import { OpenLibraryAPI } from 'packages/obsidian/src/api/apis/OpenLibraryAPI';
 import { RAWGAPI } from 'packages/obsidian/src/api/apis/RAWGAPI';
@@ -71,6 +72,7 @@ export default class MediaDbPlugin extends Plugin {
 		this.apiManager.registerAPI(new MALAPIManga(this));
 		this.apiManager.registerAPI(new WikipediaAPI(this));
 		this.apiManager.registerAPI(new MusicBrainzAPI(this));
+		this.apiManager.registerAPI(new MusicBrainzSongAPI(this));
 		this.apiManager.registerAPI(new SteamAPI(this));
 		this.apiManager.registerAPI(new TMDBSeriesAPI(this));
 		this.apiManager.registerAPI(new TMDBSeasonAPI(this));

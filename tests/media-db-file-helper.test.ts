@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { TFile } from 'obsidian';
+import { MovieModel } from 'packages/obsidian/src/models/MovieModel';
+import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTemplates';
 import { MediaDbFileHelper } from 'packages/obsidian/src/utils/MediaDbFileHelper';
 
 function createHelper(fileContent = '', frontmatter: Record<string, unknown> = {}): MediaDbFileHelper {
@@ -53,4 +55,31 @@ test('getMetadataFromFileCache returns a clone instead of cache object reference
 	(metadata.nested as { rating: number }).rating = 1;
 
 	expect(frontmatter.nested.rating).toBe(9);
+});
+
+async function getDateTimeResolverPassedToTemplate(enableCoreTemplatesIntegration: boolean): Promise<DateTimeTagResolver | undefined> {
+	let passedResolver: DateTimeTagResolver | undefined;
+	const helper = new MediaDbFileHelper({
+		app: {},
+		settings: { enableCoreTemplatesIntegration, useDefaultFrontMatter: false, enableTemplaterIntegration: false },
+		dateFormatter: { formatNow: (format: string): string => `<${format}>` },
+		mediaTypeManager: {
+			getTemplate: async (_model: unknown, _app: unknown, dateTimeResolver?: DateTimeTagResolver): Promise<string> => {
+				passedResolver = dateTimeResolver;
+				return '';
+			},
+		},
+	} as never);
+
+	await helper.generateMediaDbNoteContents(new MovieModel({ title: 'Arrival', id: '1' }), {});
+
+	return passedResolver;
+}
+
+test('generateMediaDbNoteContents resolves core Templates date and time tags only when the integration is enabled', async () => {
+	expect(await getDateTimeResolverPassedToTemplate(false)).toBeUndefined();
+
+	const resolver = await getDateTimeResolverPassedToTemplate(true);
+	expect(resolver?.formats).toEqual({ date: 'YYYY-MM-DD', time: 'HH:mm' });
+	expect(resolver?.formatNow('YYYY')).toBe('<YYYY>');
 });

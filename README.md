@@ -41,6 +41,13 @@ For arrays, there are two special ways of displaying them:
 
 Available variables that can be used in template tags are any front-matter properties.
 
+With the **Enable core Templates integration** setting turned on, the date and time variables of Obsidian's core Templates plugin work in templates as well:
+
+- `{{date}}` and `{{time}}` insert the current date and time, using the formats set in the core Templates plugin settings (default `YYYY-MM-DD` and `HH:mm`).
+- `{{date:FORMAT}}` and `{{time:FORMAT}}` use a custom [Moment.js format](https://momentjs.com/docs/#/displaying/format/), for example `{{date:dddd, MMMM Do YYYY}}`.
+
+Unlike in the core Templates plugin, `{{title}}` is always the title of the media, not the file name.
+
 I also published my own templates [here](https://github.com/mProjectsCode/obsidian-media-db-templates).
 
 #### Download poster images

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { MovieModel } from 'packages/obsidian/src/models/MovieModel';
+import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTemplates';
 import { markdownTable, migrateObject, replaceTags, wrapAround } from 'packages/obsidian/src/utils/Utils';
 
 test('replaceTags substitutes nested values and array operators', () => {
@@ -20,10 +21,32 @@ test('replaceTags reports invalid tags unless undefined values are ignored', () 
 	const movie = new MovieModel({ title: 'Alien' });
 
 	expect(replaceTags('{{ missing }}', movie)).toBe('{{ INVALID TEMPLATE TAG - object undefined }}');
-	expect(replaceTags('{{ missing }}', movie, true)).toBe('');
+	expect(replaceTags('{{ missing }}', movie, { ignoreUndefined: true })).toBe('');
 	expect(replaceTags('{{ ENUM:title }}', movie)).toBe('{{ INVALID TEMPLATE TAG - operator ENUM is only applicable on an array }}');
 	expect(replaceTags('{{ UNKNOWN:genres }}', movie)).toBe('{{ INVALID TEMPLATE TAG - unknown operator UNKNOWN }}');
 	expect(replaceTags('{{ TOO:MANY:PARTS }}', movie)).toBe('{{ INVALID TEMPLATE TAG }}');
+});
+
+const dateTimeResolver: DateTimeTagResolver = {
+	formats: { date: 'DD.MM.YYYY', time: 'h:mm A' },
+	formatNow: format => `<${format}>`,
+};
+
+test('replaceTags resolves core Templates date and time tags when enabled', () => {
+	const movie = new MovieModel({ title: 'Alien' });
+
+	expect(replaceTags('{{date}} {{ time }}', movie, { dateTimeResolver })).toBe('<DD.MM.YYYY> <h:mm A>');
+	expect(replaceTags('{{date:YYYY}} {{time:HH:mm:ss}}', movie, { dateTimeResolver })).toBe('<YYYY> <HH:mm:ss>');
+	expect(replaceTags('{{date:}}', movie, { dateTimeResolver })).toBe('<DD.MM.YYYY>');
+	expect(replaceTags('{{DATE}} {{Time:HH}}', movie, { dateTimeResolver })).toBe('<DD.MM.YYYY> <HH>');
+	expect(replaceTags('{{title}} on {{date}}', movie, { dateTimeResolver })).toBe('Alien on <DD.MM.YYYY>');
+});
+
+test('replaceTags does not resolve core Templates date and time tags when disabled', () => {
+	const movie = new MovieModel({ title: 'Alien' });
+
+	expect(replaceTags('{{date}}', movie)).toBe('{{ INVALID TEMPLATE TAG - object undefined }}');
+	expect(replaceTags('{{date:YYYY}}', movie)).toBe('{{ INVALID TEMPLATE TAG - object undefined }}');
 });
 
 test('markdownTable aligns columns and rejects jagged input', () => {

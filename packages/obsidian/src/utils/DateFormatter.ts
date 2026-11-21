@@ -27,6 +27,14 @@ export class DateFormatter {
 	}
 
 	/**
+	 * Formats the current date and time with the given moment format.
+	 * Uses the language of Obsidian instead of the locale of this machine, like the core Templates plugin.
+	 */
+	formatNow(format: string): string {
+		return momentFn().format(format);
+	}
+
+	/**
 	 * Tries to format a given date string with the currently set date format.
 	 * You can set a date format by calling `setFormat()`.
 	 *

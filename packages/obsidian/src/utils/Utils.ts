@@ -2,6 +2,7 @@ import { iso6392 } from 'iso-639-2';
 import type { TFile, TFolder, App } from 'obsidian';
 import { requestUrl } from 'obsidian';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
+import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTemplates';
 
 export const pluginName: string = 'obsidian-media-db-plugin';
 export const contactEmail: string = 'm.projects.code@gmail.com';
@@ -23,15 +24,33 @@ export function replaceIllegalFileNameCharactersInString(string: string): string
 	return string.replace(/[\\,#%&{}/*<>$"@.?]*/g, '').replace(/:+/g, ' -');
 }
 
-export function replaceTags(template: string, mediaTypeModel: MediaTypeModel, ignoreUndefined: boolean = false): string {
-	return template.replace(new RegExp('{{.*?}}', 'g'), (match: string) => replaceTag(match, mediaTypeModel, ignoreUndefined));
+/**
+ * Options for `replaceTags`.
+ * - ignoreUndefined: replace tags whose value is undefined with an empty string instead of an error message
+ * - dateTimeResolver: resolves the `{{date}}` and `{{time}}` tags of the core Templates plugin. When not set, they are treated like any other tag.
+ */
+export interface ReplaceTagsOptions {
+	ignoreUndefined?: boolean;
+	dateTimeResolver?: DateTimeTagResolver;
 }
 
-function replaceTag(match: string, mediaTypeModel: MediaTypeModel, ignoreUndefined: boolean): string {
+export function replaceTags(template: string, mediaTypeModel: MediaTypeModel, options: ReplaceTagsOptions = {}): string {
+	return template.replace(new RegExp('{{.*?}}', 'g'), (match: string) => replaceTag(match, mediaTypeModel, options));
+}
+
+function replaceTag(match: string, mediaTypeModel: MediaTypeModel, options: ReplaceTagsOptions): string {
 	let tag = match;
 	tag = tag.substring(2);
 	tag = tag.substring(0, tag.length - 2);
 	tag = tag.trim();
+
+	// Checked before the media fields, so `date` and `time` take precedence over fields with the same name
+	if (options.dateTimeResolver) {
+		const dateTimeValue = replaceDateTimeTag(tag, options.dateTimeResolver);
+		if (dateTimeValue !== undefined) {
+			return dateTimeValue;
+		}
+	}
 
 	const parts = tag.split(':');
 	if (parts.length === 1) {
@@ -40,7 +59,7 @@ function replaceTag(match: string, mediaTypeModel: MediaTypeModel, ignoreUndefin
 		const obj = traverseMetaData(path, mediaTypeModel);
 
 		if (obj === undefined) {
-			return ignoreUndefined ? '' : '{{ INVALID TEMPLATE TAG - object undefined }}';
+			return options.ignoreUndefined ? '' : '{{ INVALID TEMPLATE TAG - object undefined }}';
 		}
 
 		// eslint-disable-next-line @typescript-eslint/no-base-to-string
@@ -53,7 +72,7 @@ function replaceTag(match: string, mediaTypeModel: MediaTypeModel, ignoreUndefin
 		const obj = traverseMetaData(path, mediaTypeModel);
 
 		if (obj === undefined) {
-			return ignoreUndefined ? '' : '{{ INVALID TEMPLATE TAG - object undefined }}';
+			return options.ignoreUndefined ? '' : '{{ INVALID TEMPLATE TAG - object undefined }}';
 		}
 
 		if (operator === 'LIST') {
@@ -87,6 +106,21 @@ function replaceTag(match: string, mediaTypeModel: MediaTypeModel, ignoreUndefin
 	}
 
 	return '{{ INVALID TEMPLATE TAG }}';
+}
+
+/**
+ * Resolves `{{date}}`, `{{time}}`, `{{date:FORMAT}}` and `{{time:FORMAT}}`. Returns undefined for any other tag.
+ */
+function replaceDateTimeTag(tag: string, dateTimeResolver: DateTimeTagResolver): string | undefined {
+	const match = /^(date|time)(?::(.*))?$/i.exec(tag);
+	if (!match) {
+		return undefined;
+	}
+
+	const [, name, explicitFormat] = match;
+	const defaultFormat = name.toLowerCase() === 'date' ? dateTimeResolver.formats.date : dateTimeResolver.formats.time;
+
+	return dateTimeResolver.formatNow(explicitFormat || defaultFormat);
 }
 
 function traverseMetaData(path: string[], mediaTypeModel: MediaTypeModel): unknown {

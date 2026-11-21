@@ -82,6 +82,7 @@ export interface MediaDbPluginSettings {
 	openNoteInNewTab: boolean;
 	useDefaultFrontMatter: boolean;
 	enableTemplaterIntegration: boolean;
+	enableCoreTemplatesIntegration: boolean;
 	imageDownload: boolean;
 	imageFolder: string;
 
@@ -363,6 +364,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	openNoteInNewTab: true,
 	useDefaultFrontMatter: true,
 	enableTemplaterIntegration: false,
+	enableCoreTemplatesIntegration: false,
 	imageDownload: false,
 	imageFolder: 'Media DB/images',
 
@@ -581,6 +583,21 @@ export class MediaDbSettingTab extends PluginSettingTab {
 					.addToggle(cb => {
 						cb.setValue(this.plugin.settings.enableTemplaterIntegration).onChange(data => {
 							this.plugin.settings.enableTemplaterIntegration = data;
+							void this.plugin.saveSettings();
+						});
+					}),
+		);
+
+		generalGroup.addSetting(
+			setting =>
+				void setting
+					.setName('Enable core Templates integration')
+					.setDesc(
+						'Resolve the {{date}}, {{time}}, {{date:FORMAT}} and {{time:FORMAT}} variables of the core Templates plugin in templates. Without a format, the date and time formats from the core Templates settings are used.',
+					)
+					.addToggle(cb => {
+						cb.setValue(this.plugin.settings.enableCoreTemplatesIntegration).onChange(data => {
+							this.plugin.settings.enableCoreTemplatesIntegration = data;
 							void this.plugin.saveSettings();
 						});
 					}),

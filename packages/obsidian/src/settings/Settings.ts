@@ -49,6 +49,14 @@ function createPropertyMappingsDescription(): DocumentFragment {
 }
 
 // MARK: Settings
+/**
+ * How the MusicBrainz song API fills a song's `albums` list.
+ * - `allAlbums`: every official studio album (release-group titles), falling back to singles and EPs.
+ * - `mainAlbum`: only the earliest of those.
+ * - `allReleases`: the title of every release the recording appears on.
+ */
+export type SongAlbumSelection = 'allAlbums' | 'mainAlbum' | 'allReleases';
+
 export interface MediaDbPluginSettings {
 	OMDbKeyId: string;
 	TMDBKeyId: string;
@@ -120,6 +128,8 @@ export interface MediaDbPluginSettings {
 	boardgameFolder: string;
 	bookFolder: string;
 	songFolder: string;
+
+	songAlbumSelection: SongAlbumSelection;
 
 	propertyMappingModels: PropertyMappingModelData[];
 
@@ -398,6 +408,8 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	boardgameFolder: 'Media DB/boardgames',
 	bookFolder: 'Media DB/books',
 	songFolder: 'Media DB/songs',
+
+	songAlbumSelection: 'allAlbums',
 
 	propertyMappingModels: [],
 
@@ -832,6 +844,27 @@ export class MediaDbSettingTab extends PluginSettingTab {
 								});
 						}),
 			);
+
+			if (mediaType === MediaType.Song) {
+				mediaTypeGroup.addSetting(
+					setting =>
+						void setting
+							.setName('Album selection')
+							.setDesc(
+								'All albums: every official studio album the song is on, using release group titles so they match album notes (falls back to singles and EPs). Main album: only the earliest of those. All releases: every release the song appears on, including singles, compilations, live albums and regional editions.',
+							)
+							.addDropdown(cb => {
+								cb.addOption('allAlbums', 'All albums')
+									.addOption('mainAlbum', 'Main album')
+									.addOption('allReleases', 'All releases')
+									.setValue(this.plugin.settings.songAlbumSelection)
+									.onChange(data => {
+										this.plugin.settings.songAlbumSelection = data as SongAlbumSelection;
+										void this.plugin.saveSettings();
+									});
+							}),
+				);
+			}
 
 			// APIs
 			const apis = mediaTypeApiMap.get(mediaType) ?? [];

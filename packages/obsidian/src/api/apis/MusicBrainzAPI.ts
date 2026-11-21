@@ -1,5 +1,5 @@
 import type { RequestUrlResponse } from 'obsidian';
-import { requestUrl } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import { APIModel } from 'packages/obsidian/src/api/APIModel';
 import type MediaDbPlugin from 'packages/obsidian/src/main';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
@@ -99,19 +99,121 @@ interface MediaResponse {
 const musicBrainzRequestIntervalMs = 1000;
 let musicBrainzRequestQueue: Promise<unknown> = Promise.resolve();
 
+/** Status codes MusicBrainz uses to reject requests when the client or the server is over its rate limit. */
+const musicBrainzRetryStatuses = [429, 503];
+export const musicBrainzMaxRetries = 3;
+const musicBrainzBaseRetryDelayMs = 2000;
+// A retry never starts sooner than the rate limit allows, and never waits longer than a minute.
+const musicBrainzMinRetryDelayMs = musicBrainzRequestIntervalMs;
+const musicBrainzMaxRetryDelayMs = 60000;
+
+export interface MusicBrainzRetryInfo {
+	/** Number of the upcoming retry, starting at 1. */
+	attempt: number;
+	delayMs: number;
+	status: number;
+}
+
+export interface MusicBrainzRetryDeps {
+	request: (url: string) => Promise<RequestUrlResponse>;
+	sleep: (ms: number) => Promise<void>;
+	onRetry: (info: MusicBrainzRetryInfo) => void;
+}
+
+/**
+ * Returns the delay before the next retry.
+ * Uses the `Retry-After` header (seconds or HTTP date) if present, otherwise exponential backoff.
+ * The delay is clamped between {@link musicBrainzMinRetryDelayMs} and {@link musicBrainzMaxRetryDelayMs}.
+ */
+export function musicBrainzRetryDelayMs(headers: Record<string, string> | undefined, attempt: number, now: number = Date.now()): number {
+	const retryAfter = Object.entries(headers ?? {})
+		.find(([key]) => key.toLowerCase() === 'retry-after')?.[1]
+		?.trim();
+
+	let delayMs: number | undefined;
+	if (retryAfter) {
+		if (/^\d+(\.\d+)?$/.test(retryAfter)) {
+			delayMs = Number(retryAfter) * 1000;
+		} else {
+			const date = Date.parse(retryAfter);
+			if (!isNaN(date)) {
+				delayMs = date - now;
+			}
+		}
+	}
+	delayMs ??= musicBrainzBaseRetryDelayMs * 2 ** (attempt - 1);
+
+	return Math.min(Math.max(delayMs, musicBrainzMinRetryDelayMs), musicBrainzMaxRetryDelayMs);
+}
+
+/**
+ * Sends a request and retries it when MusicBrainz answers with a rate limit status (429 or 503).
+ * Returns the last response, so a caller still gets the rate limit status when every retry failed.
+ */
+export async function requestWithMusicBrainzRetries(url: string, deps: MusicBrainzRetryDeps): Promise<RequestUrlResponse> {
+	let response = await deps.request(url);
+
+	for (let attempt = 1; attempt <= musicBrainzMaxRetries && musicBrainzRetryStatuses.includes(response.status); attempt++) {
+		const delayMs = musicBrainzRetryDelayMs(response.headers, attempt);
+		Logger.warn(`MDB | MusicBrainz answered with status ${response.status}, retry ${attempt} of ${musicBrainzMaxRetries} in ${delayMs}ms`);
+		deps.onRetry({ attempt, delayMs, status: response.status });
+		await deps.sleep(delayMs);
+		response = await deps.request(url);
+	}
+
+	return response;
+}
+
+/**
+ * Builds the error for a MusicBrainz response that is not 200.
+ * Rate limit statuses get a message that tells the user to wait, because the request was already retried.
+ */
+export function musicBrainzStatusError(apiName: string, status: number, context: Record<string, unknown> = {}): MDBError {
+	const rateLimited = musicBrainzRetryStatuses.includes(status);
+	const userMessage = rateLimited
+		? `MusicBrainz is busy or rate limiting requests (status ${status}) and still failed after ${musicBrainzMaxRetries} retries. Wait a minute and try again.`
+		: `Received status code ${status} from ${apiName}.`;
+
+	return {
+		kind: MDBErrorKind.Api,
+		message: `MDB | ${userMessage}`,
+		userMessage,
+		context: { apiName, status, ...context },
+	};
+}
+
 /**
  * Sends a request to the MusicBrainz API with the required User-Agent.
  * Requests are queued, so that each one starts at least one second after the previous one finished.
+ * Rate limited requests are retried with backoff while they hold the queue, and a notice tells the user about the wait.
  */
 export function requestMusicBrainz(url: string): Promise<RequestUrlResponse> {
-	const request = musicBrainzRequestQueue.then(() =>
-		requestUrl({
-			url: url,
-			headers: {
-				'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
-			},
-		}),
-	);
+	const request = musicBrainzRequestQueue.then(async () => {
+		let notice: Notice | undefined;
+		try {
+			return await requestWithMusicBrainzRetries(url, {
+				request: requestUrlToTry =>
+					requestUrl({
+						url: requestUrlToTry,
+						headers: {
+							'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
+						},
+						throw: false,
+					}),
+				sleep,
+				onRetry: ({ attempt, delayMs, status }) => {
+					const message = `MusicBrainz is busy (status ${status}). Retrying in ${Math.ceil(delayMs / 1000)}s (attempt ${attempt} of ${musicBrainzMaxRetries})…`;
+					if (notice) {
+						notice.setMessage(message);
+					} else {
+						notice = new Notice(message, 0);
+					}
+				},
+			});
+		} finally {
+			notice?.hide();
+		}
+	});
 	musicBrainzRequestQueue = request.then(
 		() => sleep(musicBrainzRequestIntervalMs),
 		() => sleep(musicBrainzRequestIntervalMs),
@@ -162,12 +264,7 @@ export class MusicBrainzAPI extends APIModel {
 		// console.debug(fetchData);
 
 		if (fetchData.status !== 200) {
-			return err({
-				kind: MDBErrorKind.Api,
-				message: `MDB | Received status code ${fetchData.status} from ${this.apiName}.`,
-				userMessage: `Received status code ${fetchData.status} from ${this.apiName}.`,
-				context: { apiName: this.apiName, status: fetchData.status },
-			});
+			return err(musicBrainzStatusError(this.apiName, fetchData.status));
 		}
 
 		const data = (await fetchData.json) as {
@@ -217,12 +314,7 @@ export class MusicBrainzAPI extends APIModel {
 		const groupResponse = groupResponseResult.value;
 
 		if (groupResponse.status !== 200) {
-			return err({
-				kind: MDBErrorKind.Api,
-				message: `MDB | Received status code ${groupResponse.status} from ${this.apiName}.`,
-				userMessage: `Received status code ${groupResponse.status} from ${this.apiName}.`,
-				context: { apiName: this.apiName, status: groupResponse.status, id },
-			});
+			return err(musicBrainzStatusError(this.apiName, groupResponse.status, { id }));
 		}
 
 		const result = (await groupResponse.json) as IdResponse;
@@ -256,12 +348,7 @@ export class MusicBrainzAPI extends APIModel {
 		const releaseResponse = releaseResponseResult.value;
 
 		if (releaseResponse.status !== 200) {
-			return err({
-				kind: MDBErrorKind.Api,
-				message: `MDB | Received status code ${releaseResponse.status} from ${this.apiName}.`,
-				userMessage: `Received status code ${releaseResponse.status} from ${this.apiName}.`,
-				context: { apiName: this.apiName, status: releaseResponse.status, id, releaseId: firstRelease.id },
-			});
+			return err(musicBrainzStatusError(this.apiName, releaseResponse.status, { id, releaseId: firstRelease.id }));
 		}
 
 		const releaseData = (await releaseResponse.json) as MediaResponse;

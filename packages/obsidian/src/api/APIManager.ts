@@ -41,12 +41,13 @@ export class APIManager {
 		}
 
 		if (items.length === 0 && warnings.length > 0) {
-			// If all APIs failed, surface an error (using the first as representative)
+			// If all APIs failed, surface an error (using the first as cause) that keeps each API's message, e.g. to wait for a rate limit
+			const apiMessages = [...new Set(warnings.map(warning => warning.userMessage).filter(message => message !== undefined))];
 			return err(
 				toMdbError(warnings[0], {
 					kind: MDBErrorKind.Api,
 					message: 'Failed to query APIs',
-					userMessage: 'Failed to query APIs',
+					userMessage: ['Failed to query APIs.', ...apiMessages].join(' '),
 					context: { query, apisToQuery },
 				}),
 			);

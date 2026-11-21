@@ -1,3 +1,4 @@
+import type { RequestUrlResponse } from 'obsidian';
 import { requestUrl } from 'obsidian';
 import { APIModel } from 'packages/obsidian/src/api/APIModel';
 import type MediaDbPlugin from 'packages/obsidian/src/main';
@@ -94,6 +95,30 @@ interface MediaResponse {
 	};
 }
 
+// MusicBrainz allows at most one request per second per client, see https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+const musicBrainzRequestIntervalMs = 1000;
+let musicBrainzRequestQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Sends a request to the MusicBrainz API with the required User-Agent.
+ * Requests are queued, so that each one starts at least one second after the previous one finished.
+ */
+export function requestMusicBrainz(url: string): Promise<RequestUrlResponse> {
+	const request = musicBrainzRequestQueue.then(() =>
+		requestUrl({
+			url: url,
+			headers: {
+				'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
+			},
+		}),
+	);
+	musicBrainzRequestQueue = request.then(
+		() => sleep(musicBrainzRequestIntervalMs),
+		() => sleep(musicBrainzRequestIntervalMs),
+	);
+	return request;
+}
+
 export class MusicBrainzAPI extends APIModel {
 	plugin: MediaDbPlugin;
 	apiDateFormat: string = 'YYYY-MM-DD';
@@ -113,20 +138,13 @@ export class MusicBrainzAPI extends APIModel {
 
 		const searchUrl = `https://musicbrainz.org/ws/2/release-group?query=${encodeURIComponent(title)}&limit=20&fmt=json`;
 
-		const fetchDataResult = await fromPromise(
-			requestUrl({
-				url: searchUrl,
-				headers: {
-					'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
-				},
+		const fetchDataResult = await fromPromise(requestMusicBrainz(searchUrl), cause =>
+			toMdbError(cause, {
+				kind: MDBErrorKind.Network,
+				message: `MDB | Network error querying ${this.apiName}`,
+				userMessage: `Network error querying ${this.apiName}`,
+				context: { apiName: this.apiName, title },
 			}),
-			cause =>
-				toMdbError(cause, {
-					kind: MDBErrorKind.Network,
-					message: `MDB | Network error querying ${this.apiName}`,
-					userMessage: `Network error querying ${this.apiName}`,
-					context: { apiName: this.apiName, title },
-				}),
 		);
 		if (!fetchDataResult.ok) {
 			return err(fetchDataResult.error);
@@ -177,20 +195,13 @@ export class MusicBrainzAPI extends APIModel {
 
 		// Fetch release group
 		const groupUrl = `https://musicbrainz.org/ws/2/release-group/${encodeURIComponent(id)}?inc=releases+artists+tags+ratings+genres&fmt=json`;
-		const groupResponseResult = await fromPromise(
-			requestUrl({
-				url: groupUrl,
-				headers: {
-					'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
-				},
+		const groupResponseResult = await fromPromise(requestMusicBrainz(groupUrl), cause =>
+			toMdbError(cause, {
+				kind: MDBErrorKind.Network,
+				message: `MDB | Network error querying ${this.apiName}`,
+				userMessage: `Network error querying ${this.apiName}`,
+				context: { apiName: this.apiName, id },
 			}),
-			cause =>
-				toMdbError(cause, {
-					kind: MDBErrorKind.Network,
-					message: `MDB | Network error querying ${this.apiName}`,
-					userMessage: `Network error querying ${this.apiName}`,
-					context: { apiName: this.apiName, id },
-				}),
 		);
 		if (!groupResponseResult.ok) {
 			return err(groupResponseResult.error);
@@ -223,20 +234,13 @@ export class MusicBrainzAPI extends APIModel {
 		const releaseUrl = `https://musicbrainz.org/ws/2/release/${firstRelease.id}?inc=recordings+artists&fmt=json`;
 		Logger.log(`MDB | Fetching release recordings from: ${releaseUrl}`);
 
-		const releaseResponseResult = await fromPromise(
-			requestUrl({
-				url: releaseUrl,
-				headers: {
-					'User-Agent': `${pluginName}/${mediaDbVersion} (${contactEmail})`,
-				},
+		const releaseResponseResult = await fromPromise(requestMusicBrainz(releaseUrl), cause =>
+			toMdbError(cause, {
+				kind: MDBErrorKind.Network,
+				message: `MDB | Network error querying ${this.apiName}`,
+				userMessage: `Network error querying ${this.apiName}`,
+				context: { apiName: this.apiName, id, releaseId: firstRelease.id },
 			}),
-			cause =>
-				toMdbError(cause, {
-					kind: MDBErrorKind.Network,
-					message: `MDB | Network error querying ${this.apiName}`,
-					userMessage: `Network error querying ${this.apiName}`,
-					context: { apiName: this.apiName, id, releaseId: firstRelease.id },
-				}),
 		);
 		if (!releaseResponseResult.ok) {
 			return err(releaseResponseResult.error);

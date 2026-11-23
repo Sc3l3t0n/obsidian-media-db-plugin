@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { PropertyMapper } from 'packages/obsidian/src/settings/PropertyMapper';
-import { PropertyMapping, PropertyMappingModel, PropertyMappingOption } from 'packages/obsidian/src/settings/PropertyMapping';
+import { PropertyMapping, PropertyMappingModel, PropertyMappingOption, validateTypeProperty } from 'packages/obsidian/src/settings/PropertyMapping';
 import { MediaType } from 'packages/obsidian/src/utils/MediaType';
 import { PropertyMappingNameConflictError, PropertyMappingValidationError } from 'packages/obsidian/src/utils/Utils';
 
@@ -113,4 +113,73 @@ test('PropertyMapper restores mapped properties and migrates legacy manga type',
 		title: 'Berserk',
 		year: '1989',
 	});
+});
+
+test('PropertyMapper writes and reads the media type under the configured type property', () => {
+	const mapper = new PropertyMapper({
+		settings: {
+			typeProperty: 'mediaType',
+			propertyMappingModels: [
+				new PropertyMappingModel(MediaType.Movie, [
+					new PropertyMapping('type', 'type', PropertyMappingOption.Default, true),
+					new PropertyMapping('title', 'name', PropertyMappingOption.Map),
+				]),
+			],
+		},
+	} as never);
+
+	const converted = mapper.convertObject({ title: 'Arrival', type: MediaType.Movie, id: 'tt2543164' });
+	expect(converted).toEqual({ name: 'Arrival', mediaType: MediaType.Movie, id: 'tt2543164' });
+	expect(Object.keys(converted)).toEqual(['name', 'mediaType', 'id']);
+
+	expect(mapper.convertObjectBack({ name: 'Arrival', mediaType: MediaType.Movie, type: 'person', id: 'tt2543164' })).toEqual({
+		title: 'Arrival',
+		type: MediaType.Movie,
+		id: 'tt2543164',
+	});
+
+	const unrelatedNote = { name: 'Arrival' };
+	expect(mapper.convertObjectBack(unrelatedNote)).toBe(unrelatedNote);
+});
+
+test('PropertyMapper reads notes that still store the media type in type after the type property changed', () => {
+	const mapper = new PropertyMapper({
+		settings: {
+			typeProperty: 'mediaType',
+			propertyMappingModels: [new PropertyMappingModel(MediaType.ComicManga, [new PropertyMapping('title', 'name', PropertyMappingOption.Map)])],
+		},
+	} as never);
+
+	const legacyNote = { type: 'manga', name: 'Berserk' };
+	expect(mapper.getTypePropertySource(legacyNote)).toBe('type');
+	expect(mapper.convertObjectBack(legacyNote)).toEqual({ type: MediaType.ComicManga, title: 'Berserk' });
+
+	expect(mapper.getTypePropertySource({ type: 'person', mediaType: MediaType.ComicManga })).toBe('mediaType');
+	expect(mapper.getTypePropertySource({ name: 'Berserk' })).toBeUndefined();
+});
+
+test('validateTypeProperty rejects invalid names and names other properties are written to', () => {
+	const models = [
+		new PropertyMappingModel(MediaType.Movie, [
+			new PropertyMapping('type', 'type', PropertyMappingOption.Default, true),
+			new PropertyMapping('title', 'name', PropertyMappingOption.Map),
+			new PropertyMapping('year', 'year', PropertyMappingOption.Remove),
+		]).toJSON(),
+	];
+
+	expect(validateTypeProperty('type', models)).toEqual({ res: true });
+	expect(validateTypeProperty('mediaType', models)).toEqual({ res: true });
+	expect(validateTypeProperty('year', models)).toEqual({ res: true });
+
+	const invalidName = validateTypeProperty('media-type', models);
+	expect(invalidName.res).toBe(false);
+	expect(invalidName.err).toBeInstanceOf(PropertyMappingValidationError);
+
+	const mappedConflict = validateTypeProperty('name', models);
+	expect(mappedConflict.res).toBe(false);
+	expect(mappedConflict.err).toBeInstanceOf(PropertyMappingNameConflictError);
+
+	const modelConflict = new PropertyMappingModel(MediaType.Movie, [new PropertyMapping('title', 'mediaType', PropertyMappingOption.Map)]).validate('mediaType');
+	expect(modelConflict.res).toBe(false);
+	expect(modelConflict.err).toBeInstanceOf(PropertyMappingNameConflictError);
 });

@@ -230,6 +230,8 @@ export interface CreateNoteOptions {
 	attachFile?: TFile;
 	openNote?: boolean;
 	folder?: TFolder;
+	/** Front matter properties of the attached file that are not copied to the new note. */
+	omitAttachedProperties?: string[];
 }
 
 export function migrateObject<T extends object>(object: T, oldData: Record<string, unknown>, defaultData: T): void {

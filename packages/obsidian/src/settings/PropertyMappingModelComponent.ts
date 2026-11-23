@@ -1,16 +1,19 @@
 import { Component, setIcon } from 'obsidian';
 import type { PropertyMappingModelData } from 'packages/obsidian/src/settings/PropertyMapping';
-import { PropertyMappingModel, PropertyMappingOption, propertyMappingOptions } from 'packages/obsidian/src/settings/PropertyMapping';
+import { INTERNAL_TYPE_PROPERTY, PropertyMappingModel, PropertyMappingOption, propertyMappingOptions } from 'packages/obsidian/src/settings/PropertyMapping';
 import { capitalizeFirstLetter } from 'packages/obsidian/src/utils/Utils';
 
 interface PropertyMappingModelComponentProps {
 	model: PropertyMappingModelData;
 	save: (model: PropertyMappingModelData) => void;
+	/** Returns the front matter property name that stores the media type. */
+	getTypeProperty: () => string;
 }
 
 export default class PropertyMappingModelComponent extends Component {
 	private readonly containerEl: HTMLElement;
 	private readonly save: (model: PropertyMappingModelData) => void;
+	private readonly getTypeProperty: () => string;
 	private modelData: PropertyMappingModelData;
 	private unsavedChanges = false;
 
@@ -19,6 +22,7 @@ export default class PropertyMappingModelComponent extends Component {
 		this.containerEl = containerEl;
 		this.modelData = props.model;
 		this.save = props.save;
+		this.getTypeProperty = props.getTypeProperty;
 	}
 
 	override onload(): void {
@@ -31,18 +35,26 @@ export default class PropertyMappingModelComponent extends Component {
 
 	private get validationResult(): { res: boolean; err?: Error } {
 		const model = PropertyMappingModel.fromJSON(this.modelData);
-		return model.validate();
+		return model.validate(this.getTypeProperty());
 	}
 
 	private handleSave(): void {
 		const model = PropertyMappingModel.fromJSON(this.modelData);
-		if (!model.validate().res) {
+		if (!model.validate(this.getTypeProperty()).res) {
 			return;
 		}
 
 		this.save(model.toJSON());
 		this.unsavedChanges = false;
 		this.render();
+	}
+
+	private getLockedPropertyText(property: string): string {
+		const typeProperty = this.getTypeProperty();
+		if (property === INTERNAL_TYPE_PROPERTY && typeProperty !== INTERNAL_TYPE_PROPERTY) {
+			return `property cannot be remapped here, written as "${typeProperty}" (see the type property setting)`;
+		}
+		return 'property cannot be remapped';
 	}
 
 	private onModelUpdate(): void {
@@ -96,7 +108,7 @@ export default class PropertyMappingModelComponent extends Component {
 				lockedCellEl.colSpan = 3;
 				lockedCellEl.createDiv({
 					cls: 'media-db-plugin-property-binding-text',
-					text: 'property cannot be remapped',
+					text: this.getLockedPropertyText(property.property),
 				});
 				continue;
 			}

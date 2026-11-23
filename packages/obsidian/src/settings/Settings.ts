@@ -3,7 +3,7 @@ import { Notice, PluginSettingTab, SecretComponent, SettingGroup } from 'obsidia
 import type MediaDbPlugin from 'packages/obsidian/src/main';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
 import type { PropertyMappingModelData } from 'packages/obsidian/src/settings/PropertyMapping';
-import { PropertyMapping, PropertyMappingModel, PropertyMappingOption } from 'packages/obsidian/src/settings/PropertyMapping';
+import { INTERNAL_TYPE_PROPERTY, PropertyMapping, PropertyMappingModel, PropertyMappingOption, validateTypeProperty } from 'packages/obsidian/src/settings/PropertyMapping';
 import PropertyMappingModelsComponent from 'packages/obsidian/src/settings/PropertyMappingModelsComponent';
 import { FileSuggest } from 'packages/obsidian/src/settings/suggesters/FileSuggest';
 import { FolderSuggest } from 'packages/obsidian/src/settings/suggesters/FolderSuggest';
@@ -81,6 +81,8 @@ export interface MediaDbPluginSettings {
 	customDateFormat: string;
 	openNoteInNewTab: boolean;
 	useDefaultFrontMatter: boolean;
+	/** The front matter property that stores the media type of a note. */
+	typeProperty: string;
 	enableTemplaterIntegration: boolean;
 	enableCoreTemplatesIntegration: boolean;
 	imageDownload: boolean;
@@ -363,6 +365,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	customDateFormat: 'L',
 	openNoteInNewTab: true,
 	useDefaultFrontMatter: true,
+	typeProperty: INTERNAL_TYPE_PROPERTY,
 	enableTemplaterIntegration: false,
 	enableCoreTemplatesIntegration: false,
 	imageDownload: false,
@@ -437,7 +440,7 @@ const DEFAULT_SETTINGS: MediaDbPluginSettings = {
 	bookPropertyConversionRules: '',
 };
 
-export const lockedPropertyMappings: string[] = ['type', 'id', 'dataSource'];
+export const lockedPropertyMappings: string[] = [INTERNAL_TYPE_PROPERTY, 'id', 'dataSource'];
 
 export function getDefaultSettings(plugin: MediaDbPlugin): MediaDbPluginSettings {
 	const defaultSettings = DEFAULT_SETTINGS;
@@ -572,6 +575,32 @@ export class MediaDbSettingTab extends PluginSettingTab {
 						});
 					}),
 		);
+
+		generalGroup.addSetting(setting => {
+			setting
+				.setName('Type property')
+				.setDesc(
+					'The front matter property that stores the media type of a note. The plugin uses it to recognize Media DB notes, for example when updating metadata. Notes that still store the media type in "type" are recognized and moved to this property when their metadata is updated.',
+				);
+			const validationEl = setting.descEl.createDiv('media-db-plugin-property-mapping-validation');
+			validationEl.hide();
+			setting.addText(cb => {
+				cb.setPlaceholder(DEFAULT_SETTINGS.typeProperty)
+					.setValue(this.plugin.settings.typeProperty === DEFAULT_SETTINGS.typeProperty ? '' : this.plugin.settings.typeProperty)
+					.onChange(data => {
+						const newTypeProperty = data.trim() || DEFAULT_SETTINGS.typeProperty;
+						const validation = validateTypeProperty(newTypeProperty, this.plugin.settings.propertyMappingModels);
+						validationEl.setText(validation.err?.message ?? '');
+						validationEl.toggle(!validation.res);
+						if (!validation.res) {
+							return;
+						}
+
+						this.plugin.settings.typeProperty = newTypeProperty;
+						void this.plugin.saveSettings();
+					});
+			});
+		});
 
 		generalGroup.addSetting(
 			setting =>
@@ -952,6 +981,7 @@ export class MediaDbSettingTab extends PluginSettingTab {
 				const propertyMappingsEl = setting.descEl.createDiv();
 				this.propertyMappingModelsComponent = new PropertyMappingModelsComponent(propertyMappingsEl, {
 					models: structuredClone(this.plugin.settings.propertyMappingModels),
+					getTypeProperty: (): string => this.plugin.modelPropertyMapper.typeProperty,
 					save: (model: PropertyMappingModelData): void => {
 						// Update the matching model in settings (stored as plain data)
 						const index = this.plugin.settings.propertyMappingModels.findIndex(m => m.type === model.type);

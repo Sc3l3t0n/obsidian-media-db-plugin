@@ -1,5 +1,4 @@
 import { iso6392 } from 'iso-639-2';
-import { version as manifestVersion } from 'manifest.json';
 import type { TFile, TFolder, App } from 'obsidian';
 import { requestUrl } from 'obsidian';
 import type { MediaTypeModel } from 'packages/obsidian/src/models/MediaTypeModel';
@@ -8,7 +7,7 @@ import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTempla
 export const pluginName: string = 'obsidian-media-db-plugin';
 export const contactEmail: string = 'm.projects.code@gmail.com';
 export const mediaDbTag: string = 'mediaDB';
-export const mediaDbVersion: string = manifestVersion;
+export { version as mediaDbVersion } from 'manifest.json';
 
 export function wrapAround(value: number, size: number): number {
 	if (size <= 0) {

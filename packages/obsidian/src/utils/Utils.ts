@@ -246,7 +246,7 @@ export function unCamelCase(str: string): string {
 			// space before last upper in a sequence followed by lower
 			.replace(/\b([A-Z]+)([A-Z])([a-z])/, '$1 $2$3')
 			// uppercase the first character
-			.replace(/^./, function(str) {
+			.replace(/^./, function (str) {
 				return str.toUpperCase();
 			})
 	);

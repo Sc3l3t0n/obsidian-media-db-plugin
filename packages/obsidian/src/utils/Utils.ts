@@ -7,7 +7,7 @@ import type { DateTimeTagResolver } from 'packages/obsidian/src/utils/CoreTempla
 export const pluginName: string = 'obsidian-media-db-plugin';
 export const contactEmail: string = 'm.projects.code@gmail.com';
 export const mediaDbTag: string = 'mediaDB';
-export const mediaDbVersion: string = '0.11.0';
+export { version as mediaDbVersion } from 'manifest.json';
 
 export function wrapAround(value: number, size: number): number {
 	if (size <= 0) {

@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"paths": {
 			"packages/*": ["../packages/*"],
+			"manifest.json": ["../manifest.json"],
 			"tests/*": ["./*"]
 		},
 		"types": ["vite/client", "bun-types"]

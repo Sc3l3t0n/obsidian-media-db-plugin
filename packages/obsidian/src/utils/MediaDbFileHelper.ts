@@ -103,8 +103,11 @@ export class MediaDbFileHelper {
 			throw new Error('MDB | there is no active note');
 		}
 
-		let metadata = this.getMetadataFromFileCache(activeFile);
-		metadata = this.plugin.modelPropertyMapper.convertObjectBack(metadata);
+		const fileMetadata = this.getMetadataFromFileCache(activeFile);
+		const typePropertySource = this.plugin.modelPropertyMapper.getTypePropertySource(fileMetadata);
+		const metadata = this.plugin.modelPropertyMapper.convertObjectBack(fileMetadata);
+		// a note that still stores its media type in a different property is moved to the configured type property
+		const omitAttachedProperties = typePropertySource && typePropertySource !== this.plugin.modelPropertyMapper.typeProperty ? [typePropertySource] : [];
 
 		Logger.debug(`MDB | read metadata`, metadata);
 
@@ -133,7 +136,12 @@ export class MediaDbFileHelper {
 		Logger.debug(`MDB | newMediaTypeModel after merge`, newMediaTypeModel);
 
 		if (onlyMetadata) {
-			const result = await this.createMediaDbNoteFromModel(newMediaTypeModel, { attachFile: activeFile, folder: activeFile.parent ?? undefined, openNote: true });
+			const result = await this.createMediaDbNoteFromModel(newMediaTypeModel, {
+				attachFile: activeFile,
+				omitAttachedProperties,
+				folder: activeFile.parent ?? undefined,
+				openNote: true,
+			});
 			if (!result.ok) {
 				this.plugin.errorReporter.report(result.error);
 			}
@@ -160,7 +168,7 @@ export class MediaDbFileHelper {
 		} else {
 			fileMetadata = {
 				id: mediaTypeModel.id,
-				type: mediaTypeModel.type,
+				[this.plugin.modelPropertyMapper.typeProperty]: mediaTypeModel.type,
 				dataSource: mediaTypeModel.dataSource,
 			};
 		}
@@ -168,7 +176,7 @@ export class MediaDbFileHelper {
 		let fileContent = '';
 		template = options.attachTemplate ? template : '';
 
-		({ fileMetadata, fileContent } = await this.attachFile(fileMetadata, fileContent, options.attachFile));
+		({ fileMetadata, fileContent } = await this.attachFile(fileMetadata, fileContent, options.attachFile, options.omitAttachedProperties));
 		({ fileMetadata, fileContent } = await this.attachTemplate(fileMetadata, fileContent, template));
 
 		if (this.plugin.settings.enableTemplaterIntegration && hasTemplaterPlugin(this.plugin.app)) {
@@ -180,12 +188,15 @@ export class MediaDbFileHelper {
 		return fileContent;
 	}
 
-	async attachFile(fileMetadata: Metadata, fileContent: string, fileToAttach?: TFile): Promise<{ fileMetadata: Metadata; fileContent: string }> {
+	async attachFile(fileMetadata: Metadata, fileContent: string, fileToAttach?: TFile, omitProperties: string[] = []): Promise<{ fileMetadata: Metadata; fileContent: string }> {
 		if (!fileToAttach) {
 			return { fileMetadata, fileContent };
 		}
 
 		const attachFileMetadata = this.getMetadataFromFileCache(fileToAttach);
+		for (const property of omitProperties) {
+			delete attachFileMetadata[property];
+		}
 		fileMetadata = { ...attachFileMetadata, ...fileMetadata };
 
 		let attachFileContent = await this.plugin.app.vault.read(fileToAttach);

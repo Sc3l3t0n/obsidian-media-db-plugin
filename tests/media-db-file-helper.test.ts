@@ -47,6 +47,15 @@ test('attachFile merges attached note metadata behind generated metadata and str
 	expect(result.fileContent).toBe('Attached body');
 });
 
+test('attachFile leaves out omitted properties of the attached note', async () => {
+	const helper = createHelper('---\ntype: movie\ncustom: keep\n---\nAttached body', { type: 'movie', custom: 'keep' });
+	const file = { path: 'old.md' } as TFile;
+
+	const result = await helper.attachFile({ mediaType: 'movie', id: '1' }, '', file, ['type']);
+
+	expect(result.fileMetadata).toEqual({ custom: 'keep', mediaType: 'movie', id: '1' });
+});
+
 test('getMetadataFromFileCache returns a clone instead of cache object reference', () => {
 	const frontmatter = { title: 'Arrival', nested: { rating: 9 } };
 	const helper = createHelper('', frontmatter);
@@ -63,6 +72,7 @@ async function getDateTimeResolverPassedToTemplate(enableCoreTemplatesIntegratio
 		app: {},
 		settings: { enableCoreTemplatesIntegration, useDefaultFrontMatter: false, enableTemplaterIntegration: false },
 		dateFormatter: { formatNow: (format: string): string => `<${format}>` },
+		modelPropertyMapper: { typeProperty: 'type' },
 		mediaTypeManager: {
 			getTemplate: async (_model: unknown, _app: unknown, dateTimeResolver?: DateTimeTagResolver): Promise<string> => {
 				passedResolver = dateTimeResolver;

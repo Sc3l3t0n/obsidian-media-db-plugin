@@ -230,6 +230,8 @@ export interface CreateNoteOptions {
 	attachFile?: TFile;
 	openNote?: boolean;
 	folder?: TFolder;
+	/** Front matter properties of the attached file that are not copied to the new note. */
+	omitAttachedProperties?: string[];
 }
 
 export function migrateObject<T extends object>(object: T, oldData: Record<string, unknown>, defaultData: T): void {
@@ -246,7 +248,7 @@ export function unCamelCase(str: string): string {
 			// space before last upper in a sequence followed by lower
 			.replace(/\b([A-Z]+)([A-Z])([a-z])/, '$1 $2$3')
 			// uppercase the first character
-			.replace(/^./, function(str) {
+			.replace(/^./, function (str) {
 				return str.toUpperCase();
 			})
 	);

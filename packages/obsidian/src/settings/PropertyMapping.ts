@@ -24,6 +24,61 @@ export enum PropertyMappingOption {
 
 export const propertyMappingOptions = [PropertyMappingOption.Default, PropertyMappingOption.Map, PropertyMappingOption.Remove];
 
+/**
+ * The name of the internal property that stores the media type of a model.
+ * In note front matter this property is written under the configurable type property name.
+ */
+export const INTERNAL_TYPE_PROPERTY = 'type';
+
+/**
+ * Returns the front matter property name a property mapping writes to, or undefined if the property is removed.
+ */
+export function getOutputPropertyName(mapping: PropertyMappingData): string | undefined {
+	if (mapping.mapping === PropertyMappingOption.Remove) {
+		return undefined;
+	}
+	if (mapping.mapping === PropertyMappingOption.Map) {
+		return mapping.newProperty;
+	}
+	return mapping.property;
+}
+
+/**
+ * Returns the first property mapping that writes to the type property, if any.
+ * The internal type property itself never conflicts, because the plugin writes it under the type property name.
+ */
+function findTypePropertyConflict(properties: PropertyMappingData[], typeProperty: string): PropertyMappingData | undefined {
+	if (typeProperty === INTERNAL_TYPE_PROPERTY) {
+		return undefined;
+	}
+	return properties.find(p => p.property !== INTERNAL_TYPE_PROPERTY && getOutputPropertyName(p) === typeProperty);
+}
+
+/**
+ * Validates the configured front matter property name that stores the media type.
+ * The name must be a valid property name and may not collide with any other property that the property mappings write.
+ */
+export function validateTypeProperty(typeProperty: string, models: PropertyMappingModelData[]): { res: boolean; err?: Error } {
+	if (!typeProperty || !containsOnlyLettersAndUnderscores(typeProperty)) {
+		return {
+			res: false,
+			err: new PropertyMappingValidationError(`Type property "${typeProperty}" may not be empty and may only contain letters and underscores.`),
+		};
+	}
+
+	for (const model of models) {
+		const conflict = findTypePropertyConflict(model.properties, typeProperty);
+		if (conflict) {
+			return {
+				res: false,
+				err: new PropertyMappingNameConflictError(`Type property "${typeProperty}" conflicts with the property "${conflict.property}" of ${model.type}.`),
+			};
+		}
+	}
+
+	return { res: true };
+}
+
 export class PropertyMappingModel {
 	type: MediaType;
 	properties: PropertyMapping[];
@@ -33,7 +88,10 @@ export class PropertyMappingModel {
 		this.properties = properties ?? [];
 	}
 
-	validate(): { res: boolean; err?: Error } {
+	/**
+	 * @param typeProperty - the front matter property name that stores the media type, no other property may be written to it
+	 */
+	validate(typeProperty: string = INTERNAL_TYPE_PROPERTY): { res: boolean; err?: Error } {
 		Logger.debug(`MDB | validated property mappings for ${this.type}`);
 
 		// check properties
@@ -76,6 +134,15 @@ export class PropertyMappingModel {
 					err: new PropertyMappingNameConflictError(`Remapped property (${property}) may not share it's new name with an existing property.`),
 				};
 			}
+		}
+
+		// no property may be written to the configured type property
+		const typePropertyConflict = findTypePropertyConflict(this.properties, typeProperty);
+		if (typePropertyConflict) {
+			return {
+				res: false,
+				err: new PropertyMappingNameConflictError(`Property (${typePropertyConflict.property}) may not be written to the type property "${typeProperty}".`),
+			};
 		}
 
 		return {

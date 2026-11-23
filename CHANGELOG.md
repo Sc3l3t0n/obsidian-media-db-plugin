@@ -1,5 +1,9 @@
 # Changelog
 
+# Unreleased
+
+- Added a "Type property" setting to choose the front matter property that stores the media type of a note (default `type`). New notes write the media type under this property, and "Update metadata" reads it to recognize Media DB notes. Notes that still store the media type in `type` are recognized and moved to the new property when their metadata is updated. Property mappings may not write another property to the chosen name [#6](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/6)
+
 # 0.11.0
 
 - Added an album selection setting for songs. By default, songs now list only the official studio albums they appear on, using release group titles so links match album notes. Singles and EPs are used when a song is on no album [#2](https://github.com/Sc3l3t0n/obsidian-media-db-plugin/pull/2)

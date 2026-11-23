@@ -2,6 +2,7 @@
 	"compilerOptions": {
 		"paths": {
 			"packages/*": ["./packages/*"],
+			"manifest.json": ["./manifest.json"],
 			"tests/*": ["./tests/*"]
 		},
 		"module": "ESNext",

@@ -32,6 +32,7 @@ export default defineConfig(async ({ mode }) => {
 		resolve: {
 			alias: {
 				packages: path.resolve(__dirname, './packages'),
+				'manifest.json': path.resolve(__dirname, './manifest.json'),
 			},
 		},
 		define: {
